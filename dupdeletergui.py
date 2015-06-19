@@ -1,7 +1,9 @@
-from gi.repository import Gtk
+from gi.repository import Gtk, GLib
 import hashlib
 import os
 import collections
+import threading
+import Queue
 
 
 class mainWindow(Gtk.Window):
@@ -43,6 +45,9 @@ class mainWindow(Gtk.Window):
 
         self.create_toolbar()
 
+        self.file_scan_label = Gtk.Label(None)
+        self.file_scan_label.set_text("This is a test")
+
         self.grid.attach(self.scrollable_treelist, 0, 1, 8, 10)
         self.grid.attach_next_to(self.buttons[0], self.scrollable_treelist,
             Gtk.PositionType.BOTTOM, 1, 1)
@@ -50,48 +55,76 @@ class mainWindow(Gtk.Window):
             self.grid.attach_next_to(button, self.buttons[i],
                 Gtk.PositionType.RIGHT, 1, 1)
         self.scrollable_treelist.add(self.treeview)
+        self.grid.attach_next_to(self.file_scan_label, self.buttons[0],
+            Gtk.PositionType.BOTTOM, 8, 1)
+
+        self.queue = Queue.Queue()  # Queue for holding fetched images
 
         self.show_all()
 
-    def getDups(self, path):
+    def getDups(self, path, queue):
         '''Collects all image duplicates starting from PATH.
-        Returns a list of lists of lists containing image names and locations.'''
+        Fills a queue with lists of lists 
+        containing image names and locations.'''
         images = collections.defaultdict(list)
-        dups = []
         image_exts = ('.jpg', '.png', '.gif', '.tiff')
 
         for root, dirs, files in os.walk(path):
             for name in files:
+                GLib.idle_add(self.file_scan_label.set_text,
+                 ("Scanning: " + root))
                 if name[-4:] in image_exts:
                     img_loc = os.path.join(root, name)
                     img_data = open(img_loc).read()
                     img_hash = hashlib.md5(img_data).hexdigest()
                     images[img_hash].append([name, img_loc])
 
+        GLib.idle_add(self.file_scan_label.set_text, "Done")
+
         for group in images:
             if len(images[group]) > 1:
-                dups.append(images[group])
+                queue.put(images[group])
 
-        return dups
+        GLib.idle_add(self.generateModelData)
 
-    def generateModelData(self, path):
+    def generateModelData(self):
         '''Fills treeModel rows with found duplicates'''
-        dup_list = self.getDups(path)
-        for image_set in dup_list:
+        while not self.queue.empty():
+            image_set = self.queue.get()
             parent = ''
             for img in image_set:
-                print img
                 if not parent:
                     parent = self.dupe_store.append(None, img)
                 else:
                     self.dupe_store.append(parent, img)
+
+    def on_button_clicked_open(self, widget):
+        '''Brings up the file browser window.
+        Returns the path of the root folder.'''
+        dialog = Gtk.FileChooserDialog("Select the root folder", self,
+                Gtk.FileChooserAction.SELECT_FOLDER,
+                (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                "Select", Gtk.ResponseType.OK))
+        dialog.set_default_size(800, 400)
+
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            root = dialog.get_uri()[8:]  # have to remove file:///
+            thread = threading.Thread(target=self.getDups,
+                args=(root, self.queue))
+            thread.daemon = True
+            thread.start()
+            GLib.timeout_add(200, self.generateModelData)
+            dialog.destroy()
+        elif response == Gtk.ResponseType.CANCEL:
+            dialog.destroy()
 
     def ext_filter_func(self, model, iter, data):
         '''Tests if the image extension in the row is the one in the filter'''
         if self.current_filter_ext is None or self.current_filter_ext == "All":
             return True
         else:
-            return model[iter][0][-4:] == self.current_filter_ext
+            return model[iter][0][-3:] == self.current_filter_ext
 
     def create_toolbar(self):
         toolbar = Gtk.Toolbar()
@@ -115,29 +148,12 @@ class mainWindow(Gtk.Window):
         self.current_filter_ext = widget.get_label()
         self.ext_filter.refilter()
 
-    def on_button_clicked_open(self, widget):
-        '''Brings up the file browser window.
-        Returns the path of the root folder.'''
-        dialog = Gtk.FileChooserDialog("Select the root folder", self,
-                Gtk.FileChooserAction.SELECT_FOLDER,
-                (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                "Select", Gtk.ResponseType.OK))
-        dialog.set_default_size(800, 400)
-
-        response = dialog.run()
-        if response == Gtk.ResponseType.OK:
-            root = dialog.get_uri()[8:]  # have to remove file:///
-            self.generateModelData(root)
-        elif response == Gtk.ResponseType.CANCEL:
-            dialog.destroy() 
-
-        dialog.destroy()
-
     def on_button_clicked_delete(self, widget):
-        selected = self.treeview.get_selected_rows()
-        print selected
+        '''Deletes all selected files'''
+        print "Files deleted"
 
     def on_button_clicked_exit(self, widget):
+        '''Exits the program'''
         # Todo: add a confirmation dialog
         Gtk.main_quit()
 
