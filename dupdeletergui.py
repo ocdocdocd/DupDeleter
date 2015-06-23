@@ -1,5 +1,6 @@
 from gi.repository import Gtk, GdkPixbuf, GLib, Pango
 import hashlib
+import dhash
 import os
 import collections
 import threading
@@ -64,17 +65,19 @@ class mainWindow(Gtk.Window):
         # Assemble the GUI
         self.grid.attach(self.scrollable_treelist, 0, 1, 8, 10)
         self.grid.attach_next_to(self.img_frame, self.scrollable_treelist,
-            Gtk.PositionType.RIGHT, 5, 7)
+            Gtk.PositionType.RIGHT, 5, 6)
         self.grid.attach_next_to(self.buttons[0], self.scrollable_treelist,
             Gtk.PositionType.BOTTOM, 1, 1)
         for i, button in enumerate(self.buttons[1:]):
             self.grid.attach_next_to(button, self.buttons[i],
                 Gtk.PositionType.RIGHT, 1, 1)
         self.scrollable_treelist.add(self.treeview)
-        self.grid.attach_next_to(self.scan_status_label, self.buttons[0],
+        self.grid.attach_next_to(self.scan_status_label, self.buttons[4],
             Gtk.PositionType.BOTTOM, 3, 1)
         self.grid.attach_next_to(self.file_scan_label, self.scan_status_label,
             Gtk.PositionType.BOTTOM, 8, 1)
+        self.grid.set_column_spacing(20)
+        self.grid.set_row_spacing(10)
 
         self.queue = Queue.Queue()  # Queue for holding fetched images
 
@@ -202,8 +205,24 @@ class mainWindow(Gtk.Window):
         if child:
             self.img_frame.remove(child)
         alloc = self.img_frame.get_allocation()
+        print "alloc width is: %s" % alloc.width
+        print "alloc height is %s" % alloc.height
         pixbuf = GdkPixbuf.Pixbuf.new_from_file(img_loc)
-        pixbuf = pixbuf.scale_simple(alloc.width, alloc.height,
+        width = pixbuf.get_width()
+        height = pixbuf.get_height()
+        ratio = float(width) / float(height)
+        print "ratio is %f" % ratio
+        if width > alloc.width - 20:
+            width = alloc.width - 20
+        if height > alloc.height - 20:
+            height = alloc.height - 20
+        if ratio > 1.0:
+            height = int(height / ratio)
+            print "height is %d" % height
+        elif ratio < 1.0:
+            width = int(width / ratio)
+            print "width is %d" % width
+        pixbuf = pixbuf.scale_simple(width, height,
          GdkPixbuf.InterpType.BILINEAR)
         image = Gtk.Image.new_from_pixbuf(pixbuf)
         image.show()
