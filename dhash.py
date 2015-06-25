@@ -95,3 +95,15 @@ def isSimilar(degree, threshold=10):
     equal to threshold then returns True. Else, False.
     '''
     return degree <= threshold
+
+
+def hash(loc):
+    '''
+    Returns a hash (bitboard) of the image at loc.
+    '''
+    try:
+        im = loadImg(loc)
+        im = shrinkAndGray(im)
+        return getBits(im)
+    except:
+        return -1
