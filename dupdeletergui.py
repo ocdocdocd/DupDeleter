@@ -107,7 +107,6 @@ class mainWindow(Gtk.Window):
                               root)
                 if name[-4:] in image_exts:
                     img_loc = os.path.join(root, name)
-                    # img_data = open(img_loc).read()
                     img_hash = dhash.hash(img_loc)
                     if img_hash != -1:
                         # Have to add False at beginning because of
@@ -307,30 +306,14 @@ class mainWindow(Gtk.Window):
         img_name = model.get_value(tree_iter, 1)
         img_root = model.get_value(tree_iter, 2)
         img_loc = os.path.join(img_root, img_name)
-        # print img_loc
         child = self.img_frame.get_child()
         if child:
             self.img_frame.remove(child)
         alloc = self.img_frame.get_allocation()
-        # print "alloc width is: %s" % alloc.width
-        # print "alloc height is %s" % alloc.height
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file(img_loc)
-        width = pixbuf.get_width()
-        height = pixbuf.get_height()
-        ratio = float(width) / float(height)
-        # print "ratio is %f" % ratio
-        if width > alloc.width - 20:
-            width = alloc.width - 20
-        if height > alloc.height - 20:
-            height = alloc.height - 20
-        if ratio > 1.0:
-            height = int(height / ratio)
-            # print "height is %d" % height
-        elif ratio < 1.0:
-            width = int(width / ratio)
-            # print "width is %d" % width
-        pixbuf = pixbuf.scale_simple(width, height,
-                                     GdkPixbuf.InterpType.BILINEAR)
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(img_loc,
+                                                          alloc.width - 20,
+                                                          alloc.height - 20,
+                                                          True)
         image = Gtk.Image.new_from_pixbuf(pixbuf)
         image.show()
         self.img_frame.add(image)
