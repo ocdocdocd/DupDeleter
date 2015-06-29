@@ -203,8 +203,8 @@ class mainWindow(Gtk.Window):
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             rootiter = self.dupe_store.get_iter_first()
-            deleted = self.prune_helper(rootiter, False)
-            print "%d files deleted" % deleted
+            self.prune_helper(rootiter, False)
+            dialog.destroy()
         elif response == Gtk.ResponseType.CANCEL:
             dialog.destroy()
 
@@ -222,12 +222,12 @@ class mainWindow(Gtk.Window):
             if self.dupe_store.iter_has_child(treeiter):
                 childiter = self.dupe_store.iter_children(treeiter)
                 deleted += self.prune_helper(childiter, True)
+                self.dupe_store[treeiter][3] = self.dupe_store.iter_n_children(treeiter)
             if toDelete:
                 path = os.path.join(self.dupe_store[treeiter][2],
                                     self.dupe_store[treeiter][1])
                 os.remove(path)
                 isValid = self.dupe_store.remove(treeiter)
-                print "deleted %s" % path
                 deleted += 1
             # If treestore.remove() is successful iter is automatically
             # updated to the next iter, so we just need to check to
@@ -244,8 +244,8 @@ class mainWindow(Gtk.Window):
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             rootiter = self.dupe_store.get_iter_first()
-            deleted = self.delete_helper(rootiter)
-            print "%d files deleted" % deleted
+            self.delete_helper(rootiter)
+            dialog.destroy()
         elif response == Gtk. ResponseType.CANCEL:
             dialog.destroy()
 
@@ -269,8 +269,8 @@ class mainWindow(Gtk.Window):
                 else:
                     isValid = self.dupe_store.remove(treeiter)
                 os.remove(path)
-                print "deleted %s" % path
                 deleted += 1
+                self.dupe_store[treeiter][3] = self.dupe_store.iter_n_children(treeiter)
             else:
                 treeiter = self.dupe_store.iter_next(treeiter)
         return deleted
